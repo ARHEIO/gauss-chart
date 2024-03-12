@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import * as d3 from "d3";
 import { createGaussScorer } from "./services/gauss";
 import { useRef, useEffect } from "react";
+import { useWindowSize } from "@uidotdev/usehooks";
 
 const MARGIN = { top: 30, right: 30, bottom: 50, left: 50 };
 
@@ -18,13 +19,15 @@ const split = (mappedData: [number, number][]) => {
 };
 
 function LinePlot({
-  width = 900,
   height = 400,
   origin = 10,
   offset = 1,
   scale = 2,
   decay = 0.5,
 }) {
+  const size = useWindowSize();
+  const width = (size.width ?? 900) - 64;
+
   const scorer = createGaussScorer(origin, offset, scale, decay);
 
   const axesRef = useRef(null);
