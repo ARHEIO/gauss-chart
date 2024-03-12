@@ -19,11 +19,6 @@ body {
   height: 100vh;
 }
 
-text {
-  font-weight: 100;
-  font-size: 12px;
-}
-
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

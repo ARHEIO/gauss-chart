@@ -4,9 +4,9 @@ import { createGaussScorer } from "./services/gauss";
 import { useRef, useEffect } from "react";
 import { useWindowSize } from "@uidotdev/usehooks";
 
-const MARGIN = { top: 30, right: 30, bottom: 50, left: 50 };
+const MARGIN = { top: 30, right: 0, bottom: 50, left: 50 };
 
-const DATA_RANGE = 20;
+const DATA_RANGE = 30;
 
 const split = (mappedData: [number, number][]) => {
   const firstCut = mappedData.findIndex(([_, y]) => y === 1.0);
@@ -49,6 +49,11 @@ function LinePlot({
     .y(([_, d]) => yScale(d))
     .curve(d3.curveNatural);
 
+  const decayLine = d3
+    .line()
+    .x(([d]) => xScale(d))
+    .y(() => yScale(decay));
+
   useEffect(() => {
     const svgElement = d3.select(axesRef.current);
     svgElement.selectAll("*").remove();
@@ -67,6 +72,13 @@ function LinePlot({
 
   return (
     <svg width={width} height={height}>
+      <path
+        d={decayLine(mappedData) ?? undefined}
+        stroke="#ff6611"
+        fill="none"
+        strokeWidth={2}
+      />
+      <text transform={`translate(50, ${0.95*yScale(decay)})`} fontWeight={400}>DECAY</text>
       {slices.map((slice) => (
         <path
           key={slice.toString()}
@@ -81,6 +93,7 @@ function LinePlot({
           <>
             <circle key={i} cx={xScale(i)} cy={yScale(scorer(d))} r="2.5" />
             <text
+            fontWeight={100}
               textAnchor="center"
               transform={`translate(${xScale(i)},${
                 0.95 * yScale(scorer(d))
