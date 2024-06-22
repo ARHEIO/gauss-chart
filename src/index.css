@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -13,12 +17,6 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  margin: 0;
-  width: 100%;
-  height: 100vh;
-}
-
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
@@ -32,22 +30,8 @@ body {
   }
 }
 
-main {
-  padding: 32px;
-  display: grid;
-  grid-template-rows: min-content auto;
-  height: 100%;
+body {
+  margin: 0;
+  width: 100%;
+  height: 100vh;
 }
-
-.form {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-  justify-items: center;
-}
-
-.form label {
-  display: flex;
-  gap: 4px;
-}
-

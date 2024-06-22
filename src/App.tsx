@@ -1,189 +1,165 @@
 import { useForm } from "react-hook-form";
-import * as d3 from "d3";
-import { createGaussScorer } from "./services/gauss";
-import { useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import LinePlot from "./LinePlot";
+import { Control } from "./components";
 import { useWindowSize } from "@uidotdev/usehooks";
-
-const MARGIN = { top: 30, right: 0, bottom: 50, left: 50 };
 
 const DATA_RANGE = 30;
 
-const split = (mappedData: [number, number][]) => {
-  const firstCut = mappedData.findIndex(([_, y]) => y === 1.0);
-  const secondCut = mappedData.slice(firstCut).findIndex(([_, y]) => y !== 1.0);
-
-  const firstSlice = mappedData.slice(0, firstCut + 1);
-  const secondSlice = mappedData.slice(firstCut, firstCut + secondCut);
-  const thirdSlice = mappedData.slice(firstCut + secondCut - 1);
-  return [firstSlice, secondSlice, thirdSlice];
-};
-
-function LinePlot({
-  height = 400,
-  origin = 10,
-  offset = 1,
-  scale = 2,
-  decay = 0.5,
-}) {
-  const size = useWindowSize();
-  const width = (size.width ?? 900) - 64;
-
-  const scorer = createGaussScorer(origin, offset, scale, decay);
-
-  const axesRef = useRef(null);
-  const boundsWidth = width - MARGIN.right - MARGIN.left;
-  const boundsHeight = height - MARGIN.top - MARGIN.bottom;
-
-  const data = d3.ticks(0, DATA_RANGE, DATA_RANGE);
-  const mappedData = data.map((d) => [d, scorer(d)]) as [number, number][];
-  const slices = split(mappedData);
-
-  const xScale = d3
-    .scaleLinear([0, data.length], [MARGIN.left, boundsWidth])
-    .domain([0, data.length]);
-  const yScale = d3.scaleLinear([0, 1], [boundsHeight, MARGIN.top]);
-
-  const line = d3
-    .line()
-    .x(([d]) => xScale(d))
-    .y(([_, d]) => yScale(d))
-    .curve(d3.curveNatural);
-
-  const decayLine = d3
-    .line()
-    .x(([d]) => xScale(d))
-    .y(() => yScale(decay));
-
-  useEffect(() => {
-    const svgElement = d3.select(axesRef.current);
-    svgElement.selectAll("*").remove();
-    const xAxisGenerator = d3.axisBottom(xScale);
-    svgElement
-      .append("g")
-      .attr("transform", `translate(${-MARGIN.left},${boundsHeight})`)
-      .call(xAxisGenerator);
-
-    const yAxisGenerator = d3.axisLeft(yScale);
-    svgElement
-      .append("g")
-      .attr("transform", `translate(${-MARGIN.left / 2},${-MARGIN.top})`)
-      .call(yAxisGenerator);
-  }, [xScale, yScale, boundsHeight]);
-
-  return (
-    <svg width={width} height={height}>
-      <path
-        d={decayLine(mappedData) ?? undefined}
-        stroke="#ff6611"
-        fill="none"
-        strokeWidth={2}
-      />
-      <text transform={`translate(50, ${0.95*yScale(decay)})`} fontWeight={400}>DECAY</text>
-      {slices.map((slice) => (
-        <path
-          key={slice.toString()}
-          d={line(slice) ?? undefined}
-          stroke="#9a6fb0"
-          fill="none"
-          strokeWidth={2}
-        />
-      ))}
-      <g fill="white" stroke="currentColor" strokeWidth="1.5">
-        {data.map((d, i) => (
-          <>
-            <circle key={i} cx={xScale(i)} cy={yScale(scorer(d))} r="2.5" />
-            <text
-            fontWeight={100}
-              textAnchor="center"
-              transform={`translate(${xScale(i)},${
-                0.95 * yScale(scorer(d))
-              }) rotate(-75)`}
-            >
-              {scorer(d).toPrecision(2)}
-            </text>
-          </>
-        ))}
-      </g>
-      <g
-        width={boundsWidth}
-        height={boundsHeight}
-        ref={axesRef}
-        transform={`translate(${[MARGIN.left, MARGIN.top].join(",")})`}
-      />
-    </svg>
-  );
-}
-
 function App() {
-  const { register, watch } = useForm({
+  const searchParams = new URLSearchParams(window.location.search);
+
+  const { register, watch } = useForm<{
+    origin: number;
+    offset: number;
+    scale: number;
+    decay: number;
+    type: "gauss" | "linear";
+  }>({
     defaultValues: {
-      origin: 10,
-      offset: 1,
-      scale: 2,
-      decay: 0.5,
+      origin: z
+        .string()
+        .pipe(z.coerce.number().min(0).max(DATA_RANGE))
+        .catch(10)
+        .parse(searchParams.get("origin")),
+      offset: z
+        .string()
+        .pipe(z.coerce.number().min(0).max(DATA_RANGE))
+        .catch(1)
+        .parse(searchParams.get("offset")),
+      scale: z
+        .string()
+        .pipe(z.coerce.number().min(0).max(DATA_RANGE))
+        .catch(2)
+        .parse(searchParams.get("scale")),
+      decay: z
+        .string()
+        .pipe(z.coerce.number().min(0).max(1))
+        .catch(0.5)
+        .parse(searchParams.get("decay")),
+      type: "gauss" as const,
     },
   });
 
   const formValues = watch();
 
+  // store form state in the url search params
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("origin", formValues.origin.toString());
+    url.searchParams.set("offset", formValues.offset.toString());
+    url.searchParams.set("scale", formValues.scale.toString());
+    url.searchParams.set("decay", formValues.decay.toString());
+    window.history.replaceState({}, "", url);
+  }, [
+    formValues.decay,
+    formValues.offset,
+    formValues.origin,
+    formValues.scale,
+  ]);
+
+  const refContainer = useRef<HTMLFormElement>(null);
+  const [graphSize, setGraphSize] = useState({ height: 0, width: 0 });
+  const windowDims = useWindowSize();
+
+  useEffect(() => {
+    if (refContainer.current && windowDims.height && windowDims.width) {
+      const formHeight = refContainer.current.offsetHeight;
+
+      setGraphSize({
+        height: windowDims.height - formHeight - 32,
+        width: windowDims.width,
+      });
+    }
+  }, [refContainer, windowDims]);
+
   return (
-    <main>
-      <form className="form">
-        <label>
-          Origin
+    <main className="h-screen">
+      <form
+        className="grid grid-cols-2 justify-items-center gap-4 p-8"
+        ref={refContainer}
+      >
+        <Control>
+          <div className="label">
+            <span className="label-text">Origin</span>
+            <span className="label-text-alt">{formValues.origin}</span>
+          </div>
           <input
             type="range"
             min={0}
             max={DATA_RANGE}
-            defaultValue={10}
-            {...register("origin")}
+            {...register("origin", { valueAsNumber: true })}
+            className="range range-sm"
           />
-          {formValues.origin}
-        </label>
-        <label>
-          Offset
+        </Control>
+        <Control>
+          <div className="label">
+            <span className="label-text">Offset</span>
+            <span className="label-text-alt">{formValues.offset}</span>
+          </div>
           <input
             type="range"
             min={0}
             max={DATA_RANGE}
-            defaultValue={1}
-            {...register("offset")}
+            {...register("offset", { valueAsNumber: true })}
+            className="range range-sm"
           />
-          {formValues.offset}
-        </label>
-        <label>
-          Scale
+        </Control>
+        <Control>
+          <div className="label">
+            <span className="label-text">Scale</span>
+            <span className="label-text-alt">{formValues.scale}</span>
+          </div>
           <input
             type="range"
             min={0}
             max={DATA_RANGE}
-            defaultValue={2}
-            {...register("scale")}
+            {...register("scale", { valueAsNumber: true })}
+            className="range range-sm"
           />
-          {formValues.scale}
-        </label>
-        <label>
-          Decay
+        </Control>
+        <Control>
+          <div className="label">
+            <span className="label-text">Decay</span>
+            <span className="label-text-alt">
+              {formValues.decay.toFixed(2)}
+            </span>
+          </div>
           <input
             type="range"
             step={0.05}
-            min={0}
+            min={0.05}
             max={1}
-            defaultValue={0.5}
-            {...register("decay")}
+            className="range range-sm"
+            {...register("decay", { valueAsNumber: true })}
           />
-          {formValues.decay.toString().length < 4
-            ? formValues.decay.toString() + "0"
-            : formValues.decay.toString()}
-        </label>
+        </Control>
+        <Control>
+          <div className="label">
+            <span className="label-text">Curve Type</span>
+          </div>
+          <select
+            className="select select-bordered select-primary select-sm"
+            {...register("type")}
+          >
+            <option value="linear">linear</option>
+            <option value="gauss">gauss</option>
+          </select>
+        </Control>
       </form>
       <section>
-        <LinePlot
-          origin={formValues.origin}
-          offset={formValues.offset}
-          scale={formValues.scale}
-          decay={formValues.decay}
-        />
+        {graphSize.height !== 0 && graphSize.width !== 0 ? (
+          <LinePlot
+            height={graphSize.height}
+            width={graphSize.width}
+            origin={formValues.origin}
+            offset={formValues.offset}
+            scale={formValues.scale}
+            decay={formValues.decay}
+            type={formValues.type}
+          />
+        ) : null}
       </section>
     </main>
   );
