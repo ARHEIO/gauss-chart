@@ -1,14 +1,10 @@
 import { getDistanceFromOrigin } from "./shared";
 
-function evaluate(distanceFromOrigin: number, scale: number) {
-  return Math.exp((0.5 * Math.pow(distanceFromOrigin, 2.0)) / scale);
-}
-
 function processScale(scale: number, decay: number) {
-  return (0.5 * Math.pow(scale, 2.0)) / Math.log(decay);
+  return scale / (1 - decay);
 }
 
-export const createGaussScorer =
+export const createLinearScorer =
   (origin: number, offset: number, scale: number, decay: number) =>
   (fieldValue: number) => {
     const actualScale = processScale(scale, decay);
@@ -17,5 +13,15 @@ export const createGaussScorer =
       origin,
       offset
     );
-    return evaluate(distanceFromOrigin, actualScale);
+
+    return Math.max(0, (actualScale - distanceFromOrigin) / actualScale);
   };
+
+const scorer = createLinearScorer(0, 0, 10, 0.05);
+
+console.log(scorer(0))
+console.log(scorer(1))
+console.log(scorer(5))
+console.log(scorer(9.5))
+console.log(scorer(10))
+console.log(scorer(10.5))
