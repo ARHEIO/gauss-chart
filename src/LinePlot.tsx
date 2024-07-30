@@ -118,6 +118,7 @@ export default function LinePlot({
         .attr("key", JSON.stringify(slice))
         .attr("fill", "none")
         .attr("stroke", "currentColor")
+        .style("stroke-width", "2")
         .attr("d", convertCoordinatesToD(slice));
     });
 
@@ -157,17 +158,26 @@ export default function LinePlot({
     const chart = d3.select(chartRef.current);
     chart.select("svg > #decay-line").remove();
 
+    const group = chart.append("g").attr("id", "decay-line");
+
     const decayLine = d3.line(
       ([d]) => xScale(d),
       () => yScale(decay)
     );
 
-    chart
+    group
       .append("path")
-      .attr("id", "decay-line")
-      .style("stroke-dasharray", ("3, 3"))
+      .classed("text-primary", true)
+      .style("stroke-dasharray", "3, 3")
+      .style("stroke-width", "2")
       .attr("d", decayLine(xyCoordinates))
       .attr("stroke", "currentColor");
+
+    group
+      .append("text")
+      .attr("transform", `translate(${xScale(0) + 8},${yScale(decay) - 8})`)
+      .classed("label label-text font-bold", true)
+      .text("DECAY");
   }, [decay, xScale, yScale]);
 
   return <svg ref={chartRef} width={width} height={height} />;

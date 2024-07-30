@@ -35,3 +35,11 @@ body {
   width: 100%;
   height: 100vh;
 }
+
+label {
+  @apply form-control w-full text-primary
+}
+
+input[type=range] {
+  @apply range range-sm range-primary
+}
